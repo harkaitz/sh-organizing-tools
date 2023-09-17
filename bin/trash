@@ -1,0 +1,37 @@
+#!/bin/sh -e
+##:
+#h: Usage: trash [-k] FILES... DIRS...
+#h:
+#h: Move (or copy with -k) files to ~/TRASH/YYYY-MM-DD.
+##:
+trash() {
+    local OPTIND optopt f dir opt_k=
+    
+    ## Parse command line options.
+    while getopts "k" optopt; do
+        case $optopt in
+            k)  opt_k="y";;
+            \?) return 1;;
+        esac
+    done
+    shift $(( $OPTIND - 1 ))
+
+    ## Move or copy.
+    dir="${HOME:-${USERPROFILE}}/TRASH/$(date +%Y-%m-%d)"
+    if test -n "${opt_k}"; then
+        mkdir -p "${dir}"
+        for f in "$@"; do
+            echo "cp -r '${f}' '${dir}'"
+            cp -r "${f}" "${dir}"
+        done
+    else
+        mkdir -p "${dir}"
+        mv -vi "$@" "${dir}"
+    fi
+}
+if test @"$(basename "$0")" = @"trash";then
+    case "${1}" in
+        ''|-h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0" ;;
+        *)            trash "$@"; exit 0;;
+    esac
+fi

@@ -1,0 +1,92 @@
+#!/bin/sh -e
+##:
+#h: Usage: template [OPTS...] [OUTPUT] [TEMPLATE]
+#h:
+#h: Create file from template directory.
+#h:
+#h:   -v      : Verbose.
+#h:   -V      : Show variables.
+#h:   -L      : List template directories.
+#h:   -S NAME : Search template file.
+#h:
+#h: Environment variables: TEMPLATE_DIR
+##:
+template() {
+    local OPTIND optopt template output outdir
+    
+    ## Parse command line arguments.
+    while getopts "VLS:v" optopt; do
+        case $optopt in
+            V)  template_show_variables;     return 0;;
+            L)  template_directories;        return 0;;
+            S)  template_search "${OPTARG}"; return 0;;
+            v)  local VERBOSE=y;;
+            \?) return 1;;
+        esac
+    done
+    shift $(( $OPTIND - 1 ))
+    
+    ## List templates.
+    if test ! -n "$1"; then
+        template_list
+        return 0
+    fi
+    
+    ## Search template.
+    template="$(template_search "${2:-${1}}")"
+    test -n "${template}"
+    
+    ## Calculate output.
+    output="${1}"
+    outdir="$(dirname "${output}")"
+    
+    ## Copy template.
+    mkdir ${VERBOSE:+ -v } -p "${outdir}"
+    cp ${VERBOSE:+ -v } "${template}" "${output}"
+}
+template_show_variables() {
+    echo "TEMPLATE_DIR : ${TEMPLATE_DIR}"
+}
+template_calc_variables() {
+    TEMPLATE_DIR="${TEMPLATE_DIR:-${H}/etc/templates}" ## XDG_TEMPLATES_DIR
+}
+## -------------------------------------------------------------------
+template_directories() {
+    local d
+    if test -d "${TEMPLATE_DIR}"; then
+        printf '%s\n' "${TEMPLATE_DIR}"
+    fi
+    if which xdg-user-dir >/dev/null 2>&1; then
+        d="$(xdg-user-dir TEMPLATES)"
+        test ! -d "${d}" || printf '%s\n' "${d}"
+    fi
+}
+template_search() {
+    local d n="$1"
+    for d in $(template_directories); do
+        if test -f "${d}/${n}"; then
+            printf '%s\n' "${d}/${n}"
+            return 0
+        fi
+    done
+    echo >&2 "error: ${n}: Not found."
+    return 1
+}
+template_list() {
+    local d p="$(pwd)"
+    for d in $(template_directories); do
+        if test -d "${d}"; then
+            cd "${d}"
+            find -type f | sed 's|^..||'
+            cd "${p}"
+        fi
+    done
+}
+## -------------------------------------------------------------------
+template_calc_variables
+if test @"$(basename "$0")" = @"template";then
+    case "${1}" in
+        -h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0";;
+        *)         template "$@"; exit 0;;
+    esac
+fi

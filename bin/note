@@ -1,0 +1,57 @@
+#!/bin/sh -e
+##:
+#h: Usage: note [NOTE]
+#h:
+#h: Add a fast note to the notes file.
+#h:
+#h:     -V      : Show configuration.
+#h:     -l      : Print saved notes (default).
+#h:     -e      : Edit with *${EDITOR:-vi}*.
+#h:     -d      : Delete last note.
+#h:
+#h: Environment variables: NOTE_FILE, EDITOR
+##:
+note() {
+    local OPTIND optopt date cmd="l"
+    
+    ## Parse command line options.
+    while getopts "Vled" optopt; do # OPTARG
+        case $optopt in
+            V)     note_show_variables; return 0;;
+            l|e|d) cmd="${optopt}" ;;
+            \?)    return 1;;
+        esac
+    done
+    shift $(( $OPTIND - 1 ))
+
+    ## Save notes.
+    if test -n "$*"; then
+        date="`date '+%Y-%m-%d %H:%m'`"
+        printf '%s - %s\n' "${date}" "$*" >> "${NOTE_FILE}"
+    elif test ! -n "${cmd}"; then
+        cmd="l"
+    fi
+    
+    ## Other operations.
+    case "${cmd}" in
+        l) test ! -f "${NOTE_FILE}" || cat "${NOTE_FILE}" ;;
+        e) ${EDITOR:-vi} "${NOTE_FILE}";;
+        d) test ! -f "${NOTE_FILE}" || sed -i '$d' "${NOTE_FILE}";;
+    esac
+}
+note_show_variables() {
+    echo "NOTE_FILE : ${NOTE_FILE}"
+    echo "EDITOR    : ${EDITOR:-vi}"
+}
+note_calc_variables() {
+    NOTE_FILE="${NOTE_FILE:-${HOME}/notes.txt}"
+    EDITOR="${EDITOR:-vi}"
+}
+## -------------------------------------------------------------------
+note_calc_variables
+if test @"`basename "$0"`" = @"note";then
+    case "${1}" in
+        -h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0";;
+        *)         note "$@"; exit 0;;
+    esac
+fi

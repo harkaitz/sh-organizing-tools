@@ -1,0 +1,48 @@
+#!/bin/sh -e
+##:
+#h: Usage: trash-code FILES...
+#h:
+#h: Trash out code to a single file for an hipotetical retrieval. This
+#h: script helps removing the fear of trashing out code.
+#h:
+#h:   -V : Show honored environment variables.
+#h:   -l : Open trashed code with less.
+#h:
+#h: Environment variables: TRASH_CODE_FILE
+##:
+trash_code() {
+    local OPTIND optopt
+
+    ## Parse command line arguments.
+    while getopts "Vl" optopt; do
+        case $optopt in
+            V)  echo "TRASH_CODE_FILE : ${TRASH_CODE_FILE}"; return 0;;
+            l)  test ! -f "${TRASH_CODE_FILE}" || less "${TRASH_CODE_FILE}"; return 0;;
+            \?) return 1;;
+        esac
+    done
+    shift $(( $OPTIND - 1 ))
+
+    ## Add files.
+    mkdir -p "$(dirname "${TRASH_CODE_FILE}")"
+    for f in "$@";do
+        local b="$(basename "${f}")"
+        echo "Trashing ${b} ..." >&2
+        if true;then
+            echo "================================================================"
+            echo "===== --trash-- ${b}"
+            echo "================================================================"
+            cat "${f}"
+        fi >> "${TRASH_CODE_FILE}"
+        rm "${f}"
+    done
+    
+}
+## -------------------------------------------------------------------
+TRASH_CODE_FILE="${TRASH_CODE_FILE:-${HOME}/Documents/trash-code.txt}"
+if test @"$(basename "$0")" = @"trash-code";then
+    case "${1}" in
+        ''|-h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0" ;;
+        *)            trash_code "$@"; exit 0;;
+    esac
+fi

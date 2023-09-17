@@ -1,0 +1,92 @@
+#!/bin/sh -e
+##:
+#h: Usage: run [-V] [ACTION]
+#h:
+#h: Define an action list for a working directory. Each action is a
+#h: script, inside `./run/ACTION` or `$RUN_DIR/COLLECTION/ACTION`.
+#h:
+#h: To know which collection applies to a working directory it
+#h: executes `$RUN_DIR/COLLECTION/match.sh`.
+#h:
+#h: The file ~/RUN.cfg is sourced.
+#h:
+#h: Environment variables: RUN_DIR
+##:
+run() {
+    local OPTIND optopt cmd
+    ## Parse command line arguments.
+    while getopts "V" optopt; do
+        case $optopt in
+            V)  echo "RUN_DIR : ${RUN_DIR}";;
+            \?) return 1;;
+        esac
+    done
+    shift $(( $OPTIND - 1 ))
+    ## Print help.
+    if test ! -n "$1"; then
+        run_calc_RUN_DIRS
+        for d in ${RUN_DIRS}; do
+            for s in $(find "${d}" -type f -executable | sed '/match.sh/d'); do
+                run_print_file_help "${s}"
+            done
+        done | sort
+        return 0
+    fi
+    ## Builtin commands.
+    cmd="$1"
+    shift
+    case "${cmd}" in
+        todo) todo "$@"; return 0;;
+        alog) alog "$@"; return 0;;
+    esac
+    ## Execute run commands.
+    run_calc_RUN_DIRS
+    for d in ${RUN_DIRS}; do
+        if test -e "${d}/${cmd}"; then
+            "${d}/${cmd}" "$@"
+            return 0
+        fi
+    done
+    ## Not found.
+    echo >&2 "error: ${cmd}: Command not found."
+    return 1
+}
+## -------------------------------------------------------------------
+run_calc_RUN_DIRS() { # Fill RUN_DIRS with matching collections.
+    local name="`pwd | xargs basename`" f=''
+    RUN_DIRS=
+    if test -e "`pwd`/run"; then
+        RUN_DIRS="${RUN_DIRS} `pwd`/run"
+    fi
+    if test -e "${RUN_DIR}/${name}"; then
+        RUN_DIRS="${RUN_DIRS} ${RUN_DIR}/${name}"
+    fi
+    for f in `find "${RUN_DIR}" -mindepth 2 -maxdepth 2 -type f -name match.sh`; do
+        if sh -e "${f}"; then
+            RUN_DIRS="${RUN_DIRS} `dirname "${f}"`"
+        fi
+    done
+}
+run_print_file_help() { # FILE : Print the help line for file
+    local s="$1" h="" b=""
+    h="`sed -n 's|^.*help: *||p' "${s}"`"
+    b="`basename "${s}"`"
+    a="`echo "${h}" | sed -n 's| *:.*||p'`"
+    if test -n "${a}"; then
+        b="${b} ${a}"
+        h="`echo "${h}" | sed 's|.*: *||'`"
+    fi
+    printf '%-20s : %s (%s)\n' \
+           "${b}" "${h}" "$(dirname "${s}" | xargs basename)"
+}
+## -------------------------------------------------------------------
+RUN_DIR="${RUN_DIR:-${HOME}/RUN}"
+if test -e "${USERPROFILE:-${HOME}}/RUN.cfg"; then
+    . "${HOME}/RUN.cfg"
+fi
+if test @"`basename "$0"`" = @"run";then
+    case "${1}" in
+        -h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0";;
+        *)         run "$@"; exit 0;;
+    esac
+fi
