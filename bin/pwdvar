@@ -1,0 +1,64 @@
+#!/bin/sh -e
+##:
+#h: Usage: pwdvar ...
+#h:
+#h: Store information about projects in a separate directory.
+#h:
+#h:   -V      : Show configuration.
+#h:   -s NAME : Search file in project's directory.
+#h:   -p NAME : Print file if available.
+#h:
+#h: Configuration directories: "$H/etc/pwdvar" "~/.config/pwdvar".
+##:
+pwdvar() {
+    local OPTIND optopt opt_s= opt_p=
+    
+    ## Parse command line arguments.
+    while getopts "Vp:" optopt; do
+        case $optopt in
+            V)  pwdvar_show_variables; return 0;;
+            p)  opt_p="${OPTARG}";;
+            \?) return 1;;
+        esac
+    done
+    shift $(( $OPTIND - 1 ))
+    
+    ## Operations.
+    if test -n "${ops_s}"; then pwdvar_search "${opt_s}"; fi
+    if test -n "${opt_p}"; then pwdvar_print  "${opt_p}"; fi
+}
+pwdvar_show_variables() {
+    echo "PWDVAR_PROJECT_DIRECTORY : ${PWDVAR_PROJECT_DIRECTORY}"
+}
+pwdvar_calc_variables() {
+    local n d
+    for n in $(pwd | tr '/' '\n' | tac | sed '/-/{p;s|-.*||}'); do
+        for d in "${H}/etc/pwdvar" "${HOME}/.config/pwdvar"; do
+            if test ! -d "${d}/${n}"; then
+                continue
+            fi
+            PWDVAR_PROJECT_DIRECTORY="${d}/${n}"
+            if test -f "${PWDVAR_PROJECT_DIRECTORY}/SETTINGS"; then
+                . "${PWDVAR_PROJECT_DIRECTORY}/SETTINGS"
+            fi
+            break
+        done
+    done
+}
+## -------------------------------------------------------------------
+pwdvar_search() {
+    local d="${PWDVAR_PROJECT_DIRECTORY}"
+    test ! -n "${d}" || test ! -f "${d}/${1}" || echo "${d}/${1}"
+}
+pwdvar_print() {
+    local f="$(pwdvar_search "$1")"
+    test ! -n "${f}" || cat "${f}"
+}
+## -------------------------------------------------------------------
+pwdvar_calc_variables
+if test @"$(basename "$0")" = @"pwdvar";then
+    case "${1}" in
+        ''|-h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0" ;;
+        *)            pwdvar "$@"; exit 0;;
+    esac
+fi

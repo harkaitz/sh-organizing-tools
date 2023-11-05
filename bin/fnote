@@ -1,0 +1,60 @@
+#!/bin/sh -e
+##:
+#h: Usage: fnote -V -n NAME
+##:
+fnote() {
+    local OPTIND optopt dir f1= f2= name=
+    
+    ## Parse command line arguments.
+    while getopts "Vn:" optopt; do
+        case $optopt in
+            V)  fnote_show_variables; return 0;;
+            n)  name="${OPTARG}";;
+            \?) return 1;;
+        esac
+    done
+    shift $(( $OPTIND - 1 ))
+    if test ! -n "${name}"; then
+        echo >&2 "error: Please specify a note name with '-n'."
+        return 1
+    fi
+    
+    ## Calculate note directory.
+    if test -n "${FNOTE_DIR1}" && test -d "${FNOTE_DIR1}"; then
+        f1="${FNOTE_DIR1}/${name}"
+        
+    fi
+    mkdir -p "${FNOTE_DIR2}"
+    f2="${FNOTE_DIR2}/${name}"
+    
+    ## Edit fast note.
+    if test -n "${f1}"; then
+        if ! grep -q 'REMOVABLE NOTES' "${f1}" >/dev/null 2>&1; then
+            touch "${f1}"
+            sed -i '1i\#\# REMOVABLE NOTES' "${f1}"
+        fi
+        notepad "${f1}" &
+    fi
+    if test -n "${f2}"; then
+        if ! grep -q 'HOME NOTES' "${f2}" >/dev/null 2>&1; then
+            touch "${f2}"
+            sed -i '1i\#\# HOME NOTES' "${f2}"
+        fi
+        notepad "${f2}" &
+    fi
+}
+fnote_show_variables() {
+    echo "FNOTE_DIR1 : ${FNOTE_DIR1}"
+    echo "FNOTE_DIR2 : ${FNOTE_DIR2}"
+}
+fnote_calc_variables() {
+    FNOTE_DIR2="${FNOTE_DIR:-${HOME}/Documents/Notes}"
+}
+## -------------------------------------------------------------------
+fnote_calc_variables
+if test @"$(basename "$0")" = @"fnote";then
+    case "${1}" in
+        ''|-h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0" ;;
+        *)            fnote "$@"; exit 0                ;;
+    esac
+fi

@@ -1,0 +1,80 @@
+#!/bin/sh -e
+##:
+#h: Usage: scratch [-Ve] NAME ARGS
+#h:
+#h: Create a scratch source code for fast execution. How the
+#h: scratch file shall be executed is specified adding the
+#h: "run:" tag. Example:
+#h:
+#h:     /*
+#h:      * run: t="$(mktemp)"
+#h:      * run: gcc -o "$t" "$1"
+#h:      * run: shift
+#h:      * run: exec "$t" "$@"
+#h:      */
+#h:
+#h:     #include <stdio.h>
+#h:
+#h:     int main(int argc, char *argv[]) {
+#h:         printf("hello world\n");
+#h:         return 0;
+#h:     }
+#h:
+#h: Environment variables: SCRATCH_DIRECTORY
+##:
+scratch() {
+    local OPTIND optopt f s p="$(pwd)" opt_V= opt_e=
+    
+    ## Parse command line arguments.
+    while getopts "Ve:" optopt; do
+        case $optopt in
+            V)  opt_V="y";;
+            e)  opt_e="${OPTARG}";;
+            \?) return 1;;
+        esac
+    done
+    shift $(( $OPTIND - 1 ))
+    
+    ## Show variables.
+    if test -n "${opt_V}"; then
+        echo "SCRATCH_DIRECTORY : ${SCRATCH_DIRECTORY}"
+        return 0
+    fi
+    
+    ## Operations.
+    if test -n "${opt_e}"; then
+        ${EDITOR:-vi} "${SCRATCH_DIRECTORY}/${opt_e}"
+        return 0
+    elif test ! -n "${1}"; then
+        if test ! -d "${SCRATCH_DIRECTORY}"; then
+            echo >&2 "Empty list"
+        else
+            cd "${SCRATCH_DIRECTORY}"
+            find -type f -not -name '*~' | sed 's|^..||'
+            cd "${p}"
+        fi
+    elif test ! -f "${SCRATCH_DIRECTORY}/${1}"; then
+        echo >&2 "error: ${1}: Scratch not found."
+        return 1
+    else
+        f="${SCRATCH_DIRECTORY}/${1}"
+        s="$(sed -n 's|.*run: *||p' "${f}")"
+        shift
+        if test -n "${s}"; then
+            sh -e -c "${s}" -- "$f" "$@"
+        else
+            chmod +x "${f}"
+            "${f}" "$@"
+        fi
+    fi
+    
+    
+    
+}
+SCRATCH_DIRECTORY="${SCRATCH_DIRECTORY:-${HOME}/.scratch}"
+if test @"$(basename "$0")" = @"scratch";then
+    case "${1}" in
+        -h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0" ;;
+        *)         scratch "$@"; exit 0;;
+    esac
+fi

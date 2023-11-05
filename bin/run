@@ -69,13 +69,14 @@ run_calc_RUN_DIRS() { # Fill RUN_DIRS with matching collections.
 }
 run_print_file_help() { # FILE : Print the help line for file
     local s="$1" h="" b=""
-    h="`sed -n 's|^.*help: *||p' "${s}"`"
-    b="`basename "${s}"`"
-    a="`echo "${h}" | sed -n 's| *:.*||p'`"
+    h="$(sed -n 's|^.*help: *||p' "${s}")"
+    b="$(basename "${s}")"
+    a="$(echo "${h}" | sed -n 's| *:.*||p')"
     if test -n "${a}"; then
         b="${b} ${a}"
-        h="`echo "${h}" | sed 's|.*: *||'`"
+        h="$(echo "${h}" | sed 's|.*: *||')"
     fi
+    h="$(echo "${h}" | sed 's|^: ||')"
     printf '%-20s : %s (%s)\n' \
            "${b}" "${h}" "$(dirname "${s}" | xargs basename)"
 }

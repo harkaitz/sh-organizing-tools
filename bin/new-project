@@ -1,0 +1,139 @@
+#!/bin/sh -e
+##:
+#h: Usage: new-project [-l l|LICENSE] [-c l|LANG] [-r l|README] [-g l|REMOTE] [-u]
+##:
+. template
+. run
+new_project() {
+    
+    local OPTIND optopt ret=0 license= language= readme= remote= update=
+    
+    ## Parse command line arguments.
+    while getopts "l:c:r:g:u" optopt; do
+        case $optopt in
+            l)  license="${OPTARG}"  ;;
+            c)  language="${OPTARG}" ;;
+            r)  readme="${OPTARG}"   ;;
+            g)  remote="${OPTARG}"   ;;
+            u)  update=y             ;;
+            \?) return 1;;
+        esac
+    done
+    shift $(( $OPTIND - 1 ))
+    
+    ## Listers.
+    if test @"${license}" = @"l"; then
+        np_license_list; ret=1
+    elif test @"${readme}" = @"l"; then
+        np_readme_list; ret=1
+    elif test @"${language}" = @"l"; then
+        np_language_list; ret=1
+    elif test @"${remote}" = @"l"; then
+        np_remote_list; ret=1
+    fi
+    if test ! "${ret}" = 0; then
+        return "${ret}"
+    fi
+    if test -n "${license}"  && \
+       test -n "${readme}"   && \
+       test -n "${language}" && \
+       test -n "${remote}"; then
+        update=y
+    fi
+    
+    ## Update.
+    if test -n "${update}"; then
+        if test -n "${license}"; then
+            np_license_create "${license}"
+        fi
+        if test -n "${readme}"; then
+            np_readme_create "${readme}"
+        fi
+        if test -n "${language}"; then
+            np_language_create "${language}" "$@"
+        fi
+        if test -n "${remote}"; then
+            np_remote_create "${remote}"
+        fi
+        update="$(run 2>/dev/null | grep '^update' || true)"
+        if test -n "${update}"; then
+            run update
+        fi
+    else
+        test -n "${license}"  || echo "-l l|license  : Select license."
+        test -n "${readme}"   || echo "-r l|readme   : Select readme."
+        test -n "${language}" || echo "-c l|language : Select language."
+        test -n "${remote}"   || echo "-g l|remote   : Select remote."
+        test ! -n "${license}${readme}${language}${remote}" \
+                              || echo "-u            : To create the files."
+        return 1
+    fi
+}
+## -------------------------------------------------------------------
+np_license_list() {
+    if which license >/dev/null 2>&1; then
+        license
+    else
+        echo "empty"
+    fi
+}
+np_license_create() {
+    if which license >/dev/null 2>&1; then
+        license "$1" update
+    elif test @"$1" = @"empty"; then
+        echo '' > LICENSE
+        return 0
+    else
+        echo 'error: license(1) not installed, only "empty" allowed.'
+        return 1
+    fi
+}
+## -------------------------------------------------------------------
+np_language_list() {
+    local SEP dir
+    case "${PATH}" in '*;*') SEP=';';; *) SEP=':';; esac
+    echo "${PATH}" | tr "${SEP}" '\n' | while read -r dir; do
+        test -d "${dir}" && find "${dir}" -maxdepth 1 -mindepth 1 -iname 'np--*'
+    done | sed 's|.*/np--||'
+}
+np_language_create() {
+    local cmd="$1"
+    if which np--"${cmd}" >/dev/null 2>&1; then
+        np--"${cmd}" "$@"
+        return 0
+    else
+        return 1
+    fi
+}
+## -------------------------------------------------------------------
+np_readme_list() {
+    template | grep README
+}
+np_readme_create() {
+    template README.md "$1"
+}
+## -------------------------------------------------------------------
+np_remote_list() {
+    local SEP dir
+    case "${PATH}" in '*;*') SEP=';';; *) SEP=':';; esac
+    echo "${PATH}" | tr "${SEP}" '\n' | while read -r dir; do
+        test -d "${dir}" && find "${dir}" -maxdepth 1 -mindepth 1 -iname 'npr--*'
+    done | sed 's|.*/npr--||'
+}
+np_remote_create() {
+    local cmd="$1"
+    if which npr--"${cmd}" >/dev/null 2>&1; then
+        npr--"${cmd}" "$@"
+        return 0
+    else
+        return 1
+    fi
+}
+
+## -------------------------------------------------------------------
+if test @"$(basename "$0")" = @"new-project";then
+    case "${1}" in
+        ''|-h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0" ;;
+        *)            new_project "$@"; exit 0;;
+    esac
+fi

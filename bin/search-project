@@ -1,0 +1,46 @@
+#!/bin/sh -e
+##:
+#h: Usage: search-project NAME
+#h:
+#h: Get the path of a local project stored in one of the defined working
+#h: directories in "$H/etc/workdirs.lst" or "~/.config/workdirs.lst".
+#h:
+#h: You can map projects to directories in "~/.config/projects.map".
+##:
+search_project() {
+    local d n="$1"
+    if test -f ~/.config/projects.map; then
+        d="$(awk -v n="$1" '$1 == n { print $2 }' ~/.config/projects.map | sed "s|^~|${HOME}|g")"
+        if test -n "${d}"; then
+            printf '%s\n' "${d}"
+            return 0
+        fi
+    fi
+    
+    for d in $(search_project_directories); do
+        if test -d "$d/$n"; then
+            printf '%s\n' "$d/$n"
+            return 0
+        fi
+    done
+    echo >&2 "error: ${n}: Project not found."
+    return 1
+}
+search_project_directories() {
+    local d
+    for d in \
+        $(cat "${HOME}/.config/workdirs.lst"      2>/dev/null || true) \
+        $(sed "s|^|${H}|" "${H}/etc/workdirs.lst" 2>/dev/null || true)
+    do
+        if test -d "$d"; then
+            printf '%s\n' "$d"
+        fi
+    done
+}
+## -------------------------------------------------------------------
+if test @"$(basename "$0")" = @"search-project";then
+    case "${1}" in
+        ''|-h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0";;
+        *)            search_project "$@"; exit 0;;
+    esac
+fi

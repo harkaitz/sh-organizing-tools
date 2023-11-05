@@ -9,18 +9,20 @@ install:
 install: install-license
 install-license: 
 	mkdir -p $(DESTDIR)$(PREFIX)/share/doc/$(PROJECT)
-	cp LICENSE README.md $(DESTDIR)$(PREFIX)/share/doc/$(PROJECT)
-update: update-license
-update-license:
-	ssnip README.md
+	cp LICENSE  $(DESTDIR)$(PREFIX)/share/doc/$(PROJECT)
 ## -- BLOCK:license --
 ## -- BLOCK:sh --
 install: install-sh
 install-sh:
 	mkdir -p $(DESTDIR)$(PREFIX)/bin
-	cp bin/note             $(DESTDIR)$(PREFIX)/bin
 	cp bin/run              $(DESTDIR)$(PREFIX)/bin
+	cp bin/scratch          $(DESTDIR)$(PREFIX)/bin
 	cp bin/trash            $(DESTDIR)$(PREFIX)/bin
 	cp bin/template         $(DESTDIR)$(PREFIX)/bin
+	cp bin/search-project   $(DESTDIR)$(PREFIX)/bin
+	cp bin/fnote            $(DESTDIR)$(PREFIX)/bin
+	cp bin/new-project      $(DESTDIR)$(PREFIX)/bin
 	cp bin/trash-code       $(DESTDIR)$(PREFIX)/bin
+	cp bin/pwdvar           $(DESTDIR)$(PREFIX)/bin
+	cp bin/import-code      $(DESTDIR)$(PREFIX)/bin
 ## -- BLOCK:sh --

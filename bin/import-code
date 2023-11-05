@@ -1,0 +1,71 @@
+#!/bin/sh -e
+##:
+#h: Usage: import-code [-l (list files), -u (update)]
+#h:
+#h: Import files from your other projects to the current directory. The
+#h: list of files to import are listed in "PWDVAR/import.lst".
+#h:
+#h: The format of "PWDVAR/import.lst" is: "OFILE PROJECT/IFILE [CMD]"
+#h:
+#h: See also: pwdvar(1), search-project(1)
+##:
+. pwdvar
+. search-project
+import_code() {
+    local OPTIND optopt ops=
+    
+    ## Parse command line arguments.
+    while getopts "lu" optopt; do
+        ops="${ops}${optopt}"
+        case $optopt in
+            \?) return 1;;
+        esac
+    done
+    shift $(( $OPTIND - 1 ))
+
+    ## Operations.
+    case "${ops}" in *l*)    import_code_list   ;; esac
+    case "${ops}" in *u*|'') import_code_update ;; esac
+}
+## -------------------------------------------------------------------
+import_code_list() {
+    local ofile ifile cmd proj projd
+    pwdvar -p import.lst | while read -r ofile ipath cmd; do
+        if test -f "${ipath}"; then
+            printf '%-15s %-40s %s\n' "${ofile}" "${ipath}" "${cmd}"
+        else
+            proj="$(  echo "${ipath}" | sed -n 's|/.*||p'     )"
+            ifile="$( echo "${ipath}" | sed -n 's|^[^/]*/||p' )"
+            if test ! -n "${proj}" || test ! -n "${ifile}"; then
+                echo >&2 "error: ${ipath}: Missing / in the second column."
+                return 1
+            fi
+            projd="$(search_project "${proj}" || true)"
+            if test -n "${projd}"; then
+                printf '%-15s %-40s %s\n' "${ofile}" "${projd}/${ifile}" "${cmd}"
+            fi
+        fi
+    done
+}
+import_code_update() {
+    local ofile ifile cmd
+    import_code_list | while read -r ofile ifile cmd; do
+        echo "Updating ${ofile} ..."
+        if test -f "${ofile}"; then
+            chmod +w "${ofile}"
+        else
+            mkdir -p "$(dirname "${ofile}")"
+        fi
+        sh -e -c "${cmd:-cat}" < "${ifile}" > "${ofile}"
+        chmod -w "${ofile}"
+    done
+}
+
+
+## -------------------------------------------------------------------
+if test @"$(basename "$0")" = @"import-code";then
+    case "${1}" in
+        -h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0" ;;
+        *)         import_code "$@"; exit 0;;
+    esac
+fi

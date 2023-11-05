@@ -3,18 +3,36 @@ SH ORGANIZING TOOLS
 
 ## Help
 
-note
+fnote
 
-    Usage: note [NOTE]
+    Usage: fnote -V -n NAME
+
+import-code
+
+    Usage: import-code [-l (list files), -u (update)]
     
-    Add a fast note to the notes file.
+    Import files from your other projects to the current directory. The
+    list of files to import are listed in "PWDVAR/import.lst".
     
-        -V      : Show configuration.
-        -l      : Print saved notes (default).
-        -e      : Edit with *${EDITOR:-vi}*.
-        -d      : Delete last note.
+    The format of "PWDVAR/import.lst" is: "OFILE PROJECT/IFILE [CMD]"
     
-    Environment variables: NOTE_FILE, EDITOR
+    See also: pwdvar(1), search-project(1)
+
+new-project
+
+    Usage: new-project [-l l|LICENSE] [-c l|LANG] [-r l|README] [-g l|REMOTE] [-u]
+
+pwdvar
+
+    Usage: pwdvar ...
+    
+    Store information about projects in a separate directory.
+    
+      -V      : Show configuration.
+      -s NAME : Search file in project's directory.
+      -p NAME : Print file if available.
+    
+    Configuration directories: "$H/etc/pwdvar" "~/.config/pwdvar".
 
 run
 
@@ -29,6 +47,39 @@ run
     The file ~/RUN.cfg is sourced.
     
     Environment variables: RUN_DIR
+
+scratch
+
+    Usage: scratch [-Ve] NAME ARGS
+    
+    Create a scratch source code for fast execution. How the
+    scratch file shall be executed is specified adding the
+    "run:" tag. Example:
+    
+        /*
+         * run: t="$(mktemp)"
+         * run: gcc -o "$t" "$1"
+         * run: shift
+         * run: exec "$t" "$@"
+         */
+    
+        #include <stdio.h>
+    
+        int main(int argc, char *argv[]) {
+            printf("hello world\n");
+            return 0;
+        }
+    
+    Environment variables: SCRATCH_DIRECTORY
+
+search-project
+
+    Usage: search-project NAME
+    
+    Get the path of a local project stored in one of the defined working
+    directories in "$H/etc/workdirs.lst" or "~/.config/workdirs.lst".
+    
+    You can map projects to directories in "~/.config/projects.map".
 
 template
 
