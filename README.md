@@ -1,11 +1,39 @@
 SH ORGANIZING TOOLS
 ===================
 
+Some scripts I use to organize my work.
+
 ## Help
 
-fnote
+chad
 
-    Usage: fnote -V -n NAME
+    Usage: chad [CAT] NAME
+    
+    Access notes writen in markdown (.md).
+    
+      -V          : Show configuration.
+      -x          : Use graphical editors.
+      -k TERM     : Search term in notes.
+      -l CAT      : List files.
+      -e CAT NAME : Edit note file.
+      -a NOTE     : Add fast note to "~/.notes".
+      
+    Environment variables: CHADPATH, READER, EDITOR
+
+github-h
+
+    Usage: github-h ...
+    
+    Configure project for github.
+    
+    ... show    : Show configuration.
+    ... init    : Set "origin" and "user.{name,email}".
+    ... reset   : Restore ".git".
+    ... www     : Open project's website.
+    ... www-prj : Open "project list" section in "https://github.com".
+    ... www-new : Open "new project" section in "https://github.com".
+    ... url     : Public URL (without password)
+    ... url-pwd : Secret URL (with password)
 
 import-code
 
@@ -18,9 +46,78 @@ import-code
     
     See also: pwdvar(1), search-project(1)
 
+json-cfg
+
+    Usage: json-cfg ...
+    
+    Join JSON configurations in a single file. The input can be a JSON
+    file or a program named "json-cfg__<SET>".
+    
+      -l              : List defined configuration sets.
+      -h SET          : Print help about set.
+    
+      -i SET,ARGS...  : Add configuration from SET.
+      -i JSON-FILE    : Get settings from this input JSON.
+      -e JSON-FILE    : Save to file, will overwrite, will maintain
+                        settings not set by "-i" arguments.
+    
+    Environment variables: PATH
+
+mailctl
+
+    Usage: mailctl ...
+    
+    Read and send mails using msmtp(1) and mpop(1).
+    
+    ... recv        : Receive mails.
+    ... list-dirs   : List mailboxes.
+    ... list-year   : Print this year mails.
+    ... mark-filter < MAILS > MAILS : Only pass those not processed.
+    ... mark-delete < MAILS         : Delete mark to mails.
+    ... mark MAIL...                : Mark mail as processed.
+    ... wdir-exec NAME CMD < MAILS  : Execute in working directory.
+    ... wdir-files                  : List gathered files.
+
+make-h
+
+    Usage: make-h ...
+    
+    ... init|i [c]    : Initialize/update Makefile.
+    
+    ... add BLKS...   : Add "go" block. (go, sh, license, man)
+    ... update        : Update blocks.
+    
+    ... get VARIABLE : Get variable.
+    ... chk TARGET   : Check the target is available.
+    
+    ... project      : Get PROJECT.
+    ... version      : Get VERSION.
+    ... depends      : Get DEPENDS.
+    ... platforms    : Get PLATFORMS.
+    ... services     : Get SERVICES.
+    ... hbindings    : Get HBINDINGS.
+    ... hservice     : Get HSERVICE or "etc-haproxy -S".
+
 new-project
 
-    Usage: new-project [-l l|LICENSE] [-c l|LANG] [-r l|README] [-g l|REMOTE] [-u]
+    Usage: new-project [-l l|LICENSE] [-c l|LANG] [-r l|README]
+           [-g l|REMOTE] [-u] [LANG-ARGS...]
+    
+    (1) Licenses are created using the license(1) tool.
+    (2) Each language is defined by "np--LANG" scripts.
+    (3) Readmes are created with template(1) (basename is "README.md").
+    (4) Remotes are defined by "npr--REMOTE" scripts.
+    
+    Create a new software project from templates.
+
+orgcompat
+
+    Usage: orgcompat ...
+    
+    Compativility functions for organization tools.
+    
+    ... show  : Show configuration.
+    ... progs : List available programs.
 
 pwdvar
 
@@ -47,30 +144,6 @@ run
     The file ~/RUN.cfg is sourced.
     
     Environment variables: RUN_DIR
-
-scratch
-
-    Usage: scratch [-Ve] NAME ARGS
-    
-    Create a scratch source code for fast execution. How the
-    scratch file shall be executed is specified adding the
-    "run:" tag. Example:
-    
-        /*
-         * run: t="$(mktemp)"
-         * run: gcc -o "$t" "$1"
-         * run: shift
-         * run: exec "$t" "$@"
-         */
-    
-        #include <stdio.h>
-    
-        int main(int argc, char *argv[]) {
-            printf("hello world\n");
-            return 0;
-        }
-    
-    Environment variables: SCRATCH_DIRECTORY
 
 search-project
 

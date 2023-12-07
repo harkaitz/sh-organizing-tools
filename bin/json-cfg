@@ -1,0 +1,69 @@
+#!/bin/sh -e
+##:
+#h: Usage: json-cfg ...
+#h:
+#h: Join JSON configurations in a single file. The input can be a JSON
+#h: file or a program named "json-cfg__<SET>".
+#h:
+#h:   -l              : List defined configuration sets.
+#h:   -h SET          : Print help about set.
+#h:
+#h:   -i SET,ARGS...  : Add configuration from SET.
+#h:   -i JSON-FILE    : Get settings from this input JSON.
+#h:   -e JSON-FILE    : Save to file, will overwrite, will maintain
+#h:                     settings not set by "-i" arguments.
+#h:
+#h: Environment variables: PATH
+##:
+. orgcompat
+json_cfg() {
+    local OPTIND optopt t c num=0 jq= inputs= tmps= ofile=
+    
+    ## Parse command line arguments.
+    while getopts "lh:i:e:" optopt; do
+        case $optopt in
+            l)  orgcompat progs | sed -n 's|^json-cfg__||p'; return 0;;
+            h)  json-cfg__"${OPTARG}" --help; return 0;;
+            i)  if test -f "${OPTARG}"; then
+                    inputs="${inputs} ${OPTARG}"
+                else
+                    t="$(mktemp)"
+                    tmps="${tmps} ${t}"
+                    c="json-cfg__$(echo "${OPTARG}" | tr ',' ' ')"
+                    if ! sh -ec "${c}" > "${t}"; then
+                        echo >&2 "error: ${c}"
+                        return 1
+                    fi
+                    inputs="${inputs} ${t}"
+                fi
+                ;;
+            e)  ofile="${OPTARG}"
+                ;;
+            \?) return 1;;
+        esac
+        case $optopt in
+            i) jq="${jq}${jq:+ * }.[${num}]" num=$((num + 1));;
+        esac
+    done
+    shift $(( $OPTIND - 1 ))
+    
+    ## Perform merges.
+    if test ! -n "${ofile}"; then
+        jq -s "${jq}" ${inputs}
+    elif test -f "${ofile}"; then
+        jq -s "${jq}" ${inputs} > "${ofile}.t1"
+        jq -s '.[0] * .[1]' "${ofile}" "${ofile}.t1" > "${ofile}.t2"
+        mv "${ofile}.t2" "${ofile}"
+        rm -f "${ofile}.t1"
+    else
+        jq -s "${jq}" ${inputs} > "${ofile}"
+    fi
+}
+## -------------------------------------------------------------------
+PATH="${H_ETCDIR}/json-cfg${PATHSEP}${PATH}"
+if test @"$(basename "$0")" = @"json-cfg";then
+    case "${1}" in
+        ''|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0";;
+        *)         json_cfg "$@"; exit 0            ;;
+    esac
+fi

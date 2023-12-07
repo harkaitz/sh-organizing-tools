@@ -1,0 +1,52 @@
+#!/bin/sh -e
+##:
+#h: Usage: orgcompat ...
+#h:
+#h: Compativility functions for organization tools.
+#h:
+#h: ... show  : Show configuration.
+#h: ... progs : List available programs.
+##:
+orgcompat() {
+    local cmd="$1"
+    shift
+    case "${cmd}" in
+        show)  orgcompat_show_variables ;;
+        progs) orgcompat_progs "$1"     ;;
+        *)     echo >&2 "error: Invalid argument: ${cmd}"; return 1;;
+    esac
+}
+orgcompat_show_variables() {
+    cat <<-EOF
+	PATHSEP  : ${PATHSEP}
+	H_ETCDIR : ${H_ETCDIR}   ("$H/etc" or "~/.config")
+	EOF
+}
+orgcompat_calc_variables() {
+    case "$(uname -o)" in
+        MS/Windows) PATHSEP=';';;
+        *)          PATHSEP=':';;
+    esac
+    if test -n "${H}/etc"; then
+        H_ETCDIR="${H}/etc"
+    else
+        H_ETCDIR="${HOME}/.config"
+    fi
+}
+## -------------------------------------------------------------------
+orgcompat_progs() {
+    local IFS="${PATHSEP}" dir
+    for dir in "$@" ${PATH}; do
+        test ! -d "${dir}" || ls "${dir}"
+    done
+}
+
+
+## -------------------------------------------------------------------
+orgcompat_calc_variables
+if test @"$(basename "$0")" = @"orgcompat";then
+    case "${1}" in
+        ''|-h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0";;
+        *)            orgcompat "$@"; exit 0;;
+    esac
+fi

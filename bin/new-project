@@ -1,6 +1,14 @@
 #!/bin/sh -e
 ##:
-#h: Usage: new-project [-l l|LICENSE] [-c l|LANG] [-r l|README] [-g l|REMOTE] [-u]
+#h: Usage: new-project [-l l|LICENSE] [-c l|LANG] [-r l|README]
+#h:        [-g l|REMOTE] [-u] [LANG-ARGS...]
+#h:
+#h: (1) Licenses are created using the license(1) tool.
+#h: (2) Each language is defined by "np--LANG" scripts.
+#h: (3) Readmes are created with template(1) (basename is "README.md").
+#h: (4) Remotes are defined by "npr--REMOTE" scripts.
+#h:
+#h: Create a new software project from templates.
 ##:
 . template
 . run
@@ -115,14 +123,27 @@ np_readme_create() {
 ## -------------------------------------------------------------------
 np_remote_list() {
     local SEP dir
-    case "${PATH}" in '*;*') SEP=';';; *) SEP=':';; esac
+    if which github-h >/dev/null 2>&1; then
+        echo "github-h"
+    fi
+    if which git-ssh >/dev/null 2>&1; then
+        echo "git-ssh"
+    fi
+    case "${PATH}" in *';'*) SEP=';';; *) SEP=':';; esac
     echo "${PATH}" | tr "${SEP}" '\n' | while read -r dir; do
         test -d "${dir}" && find "${dir}" -maxdepth 1 -mindepth 1 -iname 'npr--*'
     done | sed 's|.*/npr--||'
 }
 np_remote_create() {
     local cmd="$1"
-    if which npr--"${cmd}" >/dev/null 2>&1; then
+    if test @"${cmd}" = @"github-h"; then
+        github-h init
+    elif test @"${cmd}" = @"git-ssh"; then
+        if test ! -e .git; then
+            git init
+        fi
+        git-ssh remote || true
+    elif which npr--"${cmd}" >/dev/null 2>&1; then
         npr--"${cmd}" "$@"
         return 0
     else

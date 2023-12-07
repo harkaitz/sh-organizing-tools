@@ -1,0 +1,110 @@
+#!/bin/sh -e
+##:
+#h: Usage: chad [CAT] NAME
+#h:
+#h: Access notes writen in markdown (.md).
+#h:
+#h:   -V          : Show configuration.
+#h:   -x          : Use graphical editors.
+#h:   -k TERM     : Search term in notes.
+#h:   -l CAT      : List files.
+#h:   -e CAT NAME : Edit note file.
+#h:   -a NOTE     : Add fast note to "~/.notes".
+#h:   
+#h: Environment variables: CHADPATH, READER, EDITOR
+##:
+. orgcompat
+chad() {
+    local OPTIND optopt ops=
+    
+    ## Parse command line arguments.
+    while getopts "Vxkle" optopt; do
+        ops="${ops}${optopt}"
+        case $optopt in
+            x)  EDITOR="${XEDITOR:-${EDITOR}}";;
+            \?) return 1;;
+        esac
+    done
+    shift $(( $OPTIND - 1 ))
+
+    ## Operations.
+    case "${ops}" in
+        *V*) chad_show_variables     ;;
+        *k*) chad_search "$@"        ;;
+        *l*) chad_list   "$@"        ;;
+        *e*) chad_edit   "$@"        ;;
+        '')  chad_open   "$@"        ;;
+    esac
+    
+}
+chad_show_variables() {
+    echo "CHADPATH : ${CHADPATH}"
+    echo "READER   : ${READER:-less}"
+    echo "EDITOR   : ${EDITOR:-vi}"
+}
+chad_calc_variables() {
+    CHADPATH="${CHADPATH:-/usr/share/doc/chad}"
+}
+## -------------------------------------------------------------------
+chad_list() {
+    local d IFS="${PATHSEP}" category="$1"
+    if test ! -n "${category}"; then
+        cat <<-EOF >&2
+	1    Program/command documentation.
+	2    Operating system
+	3    Programming languages
+	4    Devices
+	5    Standards, formats
+	6    Free time, health
+	7    Miscellanea, howto
+	8    System administration
+	9    Information
+	EOF
+        return 1
+    fi
+    for d in $CHADPATH; do
+        test ! -d "${d}" || find "${d}" -type f -iregex ".*/chad/${category}/.*\\.md"
+    done
+}
+chad_search() {
+    local c f h
+    local s='s|^\(.*/chad\)/\([0-9]\)/\([^/][^/]*/[^/][^/]*\)\.md:.*|\1 \2 \3|p'
+    chad_list ".*" | xargs grep -Hni -m 1 "$1" | sed -n "$s" | \
+    while read -r d c f ign; do
+        h="$(sed 1q "$d/$c/$f.md")"
+        printf '%s %-30s | %s\n' "$c" "$f" "$h"
+    done
+}
+chad_edit() {
+    local SEL
+    chad_select_SEL "$@"
+    ${EDITOR:-vi} "${SEL}"
+}
+chad_open() {
+    local SEL
+    chad_select_SEL "$@"
+    ${READER:-less} "${SEL}"
+}
+chad_select_SEL() {
+    if test -n "${1}" && test ! -n "${2}"; then
+        local cat='.*' man="${1}"
+    elif test -n "${1}" && test -n "${2}"; then
+        local cat="${1}" man="${2}"
+    else
+        echo >&2 "error: Please specify a file basename."
+        return 1
+    fi
+    SEL="$(chad_list "${cat}" | grep "/${man}\.md" | head -n 1)"
+    if test ! -n "${SEL}"; then
+        echo >&2 "error: ${SEL}: Not found."
+        return 1
+    fi
+}
+## -------------------------------------------------------------------
+chad_calc_variables
+if test @"$(basename "$0")" = @"chad"; then
+    case "${1}" in
+        ''|-h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0" ;;
+        *)            chad "$@"; exit 0                 ;;
+    esac
+fi

@@ -1,0 +1,117 @@
+#!/bin/sh -e
+##:
+#h: Usage: github-h ...
+#h:
+#h: Configure project for github.
+#h:
+#h: ... show    : Show configuration.
+#h: ... init    : Set "origin" and "user.{name,email}".
+#h: ... reset   : Restore ".git".
+#h: ... www     : Open project's website.
+#h: ... www-prj : Open "project list" section in "https://github.com".
+#h: ... www-new : Open "new project" section in "https://github.com".
+#h: ... url     : Public URL (without password)
+#h: ... url-pwd : Secret URL (with password)
+##:
+#help: Configure project for github.
+#check: true
+##:
+github_h() {
+    local cmd="$1" 
+    shift
+    if test @"${cmd}" = @"show"; then
+        cat <<-EOF
+	GITHUB_PREFIX   : $GITHUB_PREFIX
+	GITHUB_USERNAME : $GITHUB_USERNAME
+	GITHUB_REALNAME : $GITHUB_REALNAME
+	GITHUB_EMAIL    : $GITHUB_EMAIL
+	GITHUB_PROJECT  : $GITHUB_PROJECT
+	EOF
+        return 0
+    fi
+    github_h_check_variables
+    case "${cmd}" in
+        init)     github_h_init     "$@" ;;
+        reset)    github_h_reset    "$@" ;;
+        www)      github_h_www      "$@" ;;
+        www-prj)  github_h_www_prj  "$@" ;;
+        www-new)  github_h_www_new  "$@" ;;
+        url)      github_h_url      "$@" ;;
+        url-pwd)  github_h_url_pwd  "$@" ;;
+        *)        echo >&2 "error: Invalid argument: $cmd"; return 1;;
+    esac
+}
+
+github_h_check_variables() {
+    local r=0
+    if test ! -n "${GITHUB_USERNAME}"; then
+        echo >&2 "error: Please set GITHUB_USERNAME."; r=1
+    fi
+    if test ! -n "${GITHUB_REALNAME}"; then
+        echo >&2 "error: Please set GITHUB_REALNAME."; r=1
+    fi
+    if test ! -n "${GITHUB_EMAIL}"; then
+        echo >&2 "error: Please set GITHUB_EMAIL."; r=1
+    fi
+    if test ! -n "${GITHUB_PREFIX}"; then
+        echo >&2 "error: Please set GITHUB_PREFIX."; r=1
+    fi
+    return "$r"
+}
+## -------------------------------------------------------------------
+github_h_url() {
+    echo "https://github.com/${GITHUB_USERNAME}/${GITHUB_PROJECT}.git"
+}
+github_h_url_pwd() {
+    echo "${GITHUB_PREFIX}/${GITHUB_PROJECT}.git"
+}
+## -------------------------------------------------------------------
+github_h_init() {
+    ## Get URL.
+    local url="$(github_h_url_pwd)"
+    test -n "${url}"
+    
+    ## Initialize git.
+    if test ! -e .git; then
+        github_h_vrun git init
+    fi
+    ## Set origin
+    github_h_vrun git remote remove origin 2>/dev/null || true
+    github_h_vrun git remote add origin "${url}"
+    ## Set name and email.
+    github_h_vrun git config --local --replace-all user.name  "${GITHUB_REALNAME}"
+    github_h_vrun git config --local --replace-all user.email "${GITHUB_EMAIL}"
+}
+github_h_reset() {
+    ## Clone repository.
+    local p="$(pwd | sed 's|.*/||;s|\.git$||')"
+    local t="$(mktemp -d)"
+    github_h_vrun git clone "${GITHUB_PREFIX}/${p}.git" "${t}"
+    github_h_vrun rm -rf ".git"
+    github_h_vrun mv "${t}/.git" "$(pwd)" 
+    github_h_vrun rm -rf "${t}"
+    ## Set name and email.
+    github_h_vrun git config --local --replace-all user.name  "${GITHUB_REALNAME}"
+    github_h_vrun git config --local --replace-all user.email "${GITHUB_EMAIL}"
+}
+github_h_www() {
+    xdg-open "https://github.com/${GITHUB_USERNAME}/${GITHUB_PROJECT}"
+}
+github_h_www_prj() {
+    xdg-open "https://github.com/${GITHUB_USERNAME}?tab=repositories"
+}
+github_h_www_new() {
+    xdg-open "https://github.com/new"
+}
+github_h_vrun() {
+    echo >&2 "$*"
+    "$@"
+}
+## -------------------------------------------------------------------
+GITHUB_PROJECT="${GITHUB_PROJECT:-$(pwd | sed 's|.*/||;s|\.git$||')}"
+if test @"$(basename "$0")" = @"github-h";then
+    case "${1}" in
+        ''|-h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0" ;;
+        *)            github_h "$@"; exit 0 ;;
+    esac
+fi

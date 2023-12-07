@@ -1,0 +1,115 @@
+#!/bin/sh -e
+##:
+#h: Usage: mailctl ...
+#h:
+#h: Read and send mails using msmtp(1) and mpop(1).
+#h:
+#h: ... recv        : Receive mails.
+#h: ... list-dirs   : List mailboxes.
+#h: ... list-year   : Print this year mails.
+#h: ... mark-filter < MAILS > MAILS : Only pass those not processed.
+#h: ... mark-delete < MAILS         : Delete mark to mails.
+#h: ... mark MAIL...                : Mark mail as processed.
+#h: ... wdir-exec NAME CMD < MAILS  : Execute in working directory.
+#h: ... wdir-files                  : List gathered files.
+##:
+mailctl() {
+    local cmd="$1"
+    shift
+    case "${cmd}" in
+        recv)        mailctl_recv            ;;
+        list-dirs)   mailctl_list_dirs       ;;
+        list-year)   mailctl_list_year       ;;
+        mark-filter) mailctl_mark_filter     ;;
+        mark-delete) mailctl_mark_delete     ;;
+        mark)        mailctl_mark "$@"       ;;
+        wdir-exec)   mailctl_wdir_exec "$@"  ;;
+        wdir-files)  mailctl_wdir_files "$@" ;;
+    esac
+}
+## -------------------------------------------------------------------
+mailctl_recv() {
+    if which mpop >/dev/null 2>&1; then
+        mpop -a
+    fi
+}
+mailctl_list_dirs() {
+    if test -e ~/.mpoprc; then
+        sed -n 's|^delivery  *maildir  *||p' ~/.mpoprc
+    fi
+}
+mailctl_list_year() {
+    mlist $(mailctl_list_dirs) | magrep "date:.*$(date "+%Y").*"
+}
+## -------------------------------------------------------------------
+mailctl_mark_filter() {
+    local mail
+    while read -r mail; do
+        if ! grep -q "${mail}" ~/.mailctl.marked 2>/dev/null; then
+            echo "${mail}"
+        fi
+    done
+}
+mailctl_mark_delete() {
+    local mail
+    while read -r mail; do
+        sed -i "\|${mail}|d" ~/.mailctl.marked 2>/dev/null || true
+        echo "${mail}"
+    done
+}
+mailctl_mark() {
+    local mail
+    for mail in "$@"; do
+        echo "${mail}" >> ~/.mailctl.marked
+    done
+}
+## -------------------------------------------------------------------
+mailctl_wdir_exec() {
+    local name="$1" pwd="$(pwd)" gdir wdir date mail
+    if test ! -n "${name}"; then
+        echo >&2 "error: Missing category name."
+        return 1
+    fi
+    shift
+    gdir="${HOME}/Documents/$(date +%Y)/${name}"
+    echo "## -- DOWNLOADS (${name}) --"
+    while read -r mail; do    
+    
+        ## Get date of the mail.
+        date="$(mhdr -h Date -D "${mail}")";      test -n "${date}"
+        date="$(date -d "@${date}" '+%Y-%m-%d')"; test -n "${date}"
+        wdir="${gdir}/${date}"
+        
+        ## Create directory and execute.
+        mkdir -p "${wdir}"
+        cd "${wdir}"
+        echo "[${wdir}]"
+        echo "${mail}"
+        eval "$*"
+        cd "${pwd}"
+
+        ## Mark mail as done.
+        mailctl mark "${mail}"
+    done
+    echo "## -- DOWNLOADS (${name})--"
+}
+mailctl_wdir_files() {
+    local name="$1"
+    if test ! -n "${name}"; then
+        echo >&2 "error: Missing category name."
+        return 1
+    fi
+    gdir="${HOME}/Documents/$(date +%Y)/${name}"
+    if test -d "${gdir}"; then
+        echo "## -- FILES (${name}) --"
+        find "${gdir}" -type f | sort
+        echo "## -- FILES (${name}) --"
+    fi
+}
+## -------------------------------------------------------------------
+if test @"$(basename "$0")" = @"mailctl";then
+    case "${1}" in
+        ''|-h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0" ;;
+        *)            mailctl "$@"; exit 0              ;;
+    esac
+fi

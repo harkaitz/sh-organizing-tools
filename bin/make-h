@@ -1,0 +1,207 @@
+#!/bin/sh -e
+##:
+#h: Usage: make-h ...
+#h:
+#h: ... init|i [c]    : Initialize/update Makefile.
+#h:
+#h: ... add BLKS...   : Add "go" block. (go, sh, license, man)
+#h: ... update        : Update blocks.
+#h:
+#h: ... get VARIABLE : Get variable.
+#h: ... chk TARGET   : Check the target is available.
+#h:
+#h: ... project      : Get PROJECT.
+#h: ... version      : Get VERSION.
+#h: ... depends      : Get DEPENDS.
+#h: ... platforms    : Get PLATFORMS.
+#h: ... services     : Get SERVICES.
+#h: ... hbindings    : Get HBINDINGS.
+#h: ... hservice     : Get HSERVICE or "etc-haproxy -S".
+##:
+make_h() {
+    local cmd="$1" V
+    shift
+    case "${cmd}" in
+        init|i)     make_h_init "$@" ;;
+        add|a)      make_h_add  "$@" ;;
+        update|u)   make_h_update    ;;
+
+        get)        make_h_V "$1"; echo "$V";;
+        chk)        make_h_chk "$1"  ;;
+        
+        project)    make_h_project   ;;
+        version)    make_h_version   ;;
+        depends)    make_h_depends   ;;
+        platforms)  make_h_platforms ;;
+        services)   make_h_services  ;;
+        hbindings)  make_h_hbindings ;;
+        hservice)   make_h_hservice  ;;
+        *)          echo >&2 "error: Invalid argument: ${cmd}"; return 1;;
+    esac
+}
+make_h_show_variables() {
+    echo "MAKEFILE  : ${MAKEFILE}"
+    echo "GITIGNORE : ${GITIGNORE}"
+}
+make_h_calc_variables() {
+    if test -n "${MAKEFILE}"; then
+        true
+    elif test -e GNUmakefile; then
+        MAKEFILE="GNUmakefile"
+    elif test -e Makefile; then
+        MAKEFILE="Makefile"
+    else
+        MAKEFILE="GNUmakefile"
+    fi
+    GITIGNORE="${GITIGNORE:-.gitignore}"
+}
+## -------------------------------------------------------------------
+make_h_init() {
+    if test ! -e "${MAKEFILE}"; then
+        echo "Creating ${MAKEFILE} ..."
+        echo > "${MAKEFILE}"
+    fi
+    if test ! -e "${GITIGNORE}"; then
+        echo "Creating ${GITIGNORE} ..."
+        echo > "${GITIGNORE}"
+    fi
+
+    if ! grep -q '^install:' "${MAKEFILE}"; then
+        echo "Adding install to ${MAKEFILE} ..."
+        sed -i "1iinstall:" "${MAKEFILE}"
+    fi
+    if ! grep -q '^clean:' "${MAKEFILE}"; then
+        echo "Adding clean to ${MAKEFILE} ..."
+        sed -i "1iclean:" "${MAKEFILE}"
+    fi
+    if ! grep -q '^all:' "${MAKEFILE}"; then
+        echo "Adding all to ${MAKEFILE} ..."
+        sed -i "1iall:" "${MAKEFILE}"
+    fi
+    for arg in "$@"; do
+        case "${arg}" in
+            c)
+                if ! grep -q '^CC *= *' "${MAKEFILE}"; then
+                    echo "Adding CC to ${MAKEFILE} ..."
+                    sed -i "1iCC=gcc -Wall -std=c99" "${MAKEFILE}"
+                fi
+                ;;
+        esac
+        case "${arg}" in
+            c|cc)
+                if ! grep -q '^PROGS *= *' "${MAKEFILE}"; then
+                    echo "Adding PROGS to ${MAKEFILE} ..."
+                    sed -i "1iPROGS=" "${MAKEFILE}"
+                fi
+                ;;
+        esac
+    done
+    
+    if ! grep -q '^PREFIX *= *' "${MAKEFILE}"; then
+        echo "Adding PREFIX to ${MAKEFILE} ..."
+        sed -i "1iPREFIX=/usr/local" "${MAKEFILE}"
+    fi
+
+    if ! grep -q '^VERSION *= *' "${MAKEFILE}"; then
+        echo "Adding VERSION to ${MAKEFILE} ..."
+        sed -i "1iVERSION=1.0.0" "${MAKEFILE}"
+    fi
+
+    if ! grep -q '^PROJECT *= *' "${MAKEFILE}"; then
+        echo "Adding PROJECT to ${MAKEFILE} ..."
+        sed -i "1iPROJECT=$(basename $(pwd))" "${MAKEFILE}"
+    fi
+
+    
+}
+make_h_add() {
+    local b
+    make_h_init
+    for b in "$@"; do
+        sed -i "/BLOCK:${b}/,/BLOCK:${b}/d" "${MAKEFILE}" "${GITIGNORE}"
+    done
+    ##
+    for b in "$@"; do
+        if ! which make-h-"${b}" >/dev/null 2>&1; then
+            echo >&2 "error: make-h-${b}: Not found."
+            return 1
+        fi
+        echo "Adding block '${b}' to '${MAKEFILE}' ..." >&2
+        echo "## -- BLOCK:${b} --"
+        make-h-"${b}" makefile
+        echo "## -- BLOCK:${b} --"
+    done >> "${MAKEFILE}"
+    ##
+    for b in "$@"; do
+        echo "Adding block '${b}' to '${GITIGNORE}' ..." >&2
+        echo "## -- BLOCK:${b} --"
+        make-h-"${b}" gitignore
+        echo "## -- BLOCK:${b} --"
+    done >> "${GITIGNORE}"
+}
+make_h_chk() {
+    if make -n "${1:-all}" >/dev/null 2>&1; then
+        echo "${1:-all}"
+        return 0
+    else
+        return 1
+    fi
+}
+make_h_update() {
+    make_h_add $(make_h_blocks)
+}
+make_h_blocks() {
+    if test -f "${MAKEFILE}"; then
+        sed -n 's|.*BLOCK:\([^ ]*\).*|\1|p' "${MAKEFILE}" | sort -u
+    fi
+}
+## -------------------------------------------------------------------
+make_h_V() {
+    if test ! -e "${MAKEFILE}"; then
+        echo >&2 "error: ${MAKEFILE}: File not found."
+        return 1
+    fi
+    sed 's|^    |	|' > /tmp/m <<-EOF
+	print-${1}:
+	include ${MAKEFILE}
+	print-${1}:
+	    @echo "\$(${1})"
+	EOF
+    V="$(make -f /tmp/m)"
+    if test ! -n "${V}"; then
+        echo >&2 "error: ${MAKEFILE}: Variable ${1} not set."
+        return 1
+    fi
+}
+make_h_project()   { local V; make_h_V PROJECT;      echo "${V}" | sed 's|^sh-||'; }
+make_h_version()   { local V; make_h_V VERSION;      echo "${V}"; }
+make_h_depends()   { local V; make_h_V DEPENDENCIES; echo "${V}"; }
+make_h_platforms() { local V; make_h_V PLATFORMS;    echo "${V}"; }
+make_h_services()  { local V; make_h_V SERVICES;     echo "${V}"; }
+make_h_hbindings() { local V; make_h_V HBINDINGS;    echo "${V}"; }
+make_h_hservice() {
+    local V
+    if test -e "${MAKEFILE}"; then
+        sed 's|^    |	|' > /tmp/m <<-EOF
+	print-HSERVICE:
+	include ${MAKEFILE}
+	print-HSERVICE:
+	    @echo "\$(HSERVICE)"
+	EOF
+        V="$(make -f /tmp/m)"
+        if test -n "${V}"; then
+            echo "${V}"
+            return 0
+        fi
+    fi
+    etc-haproxy -S  
+}
+
+## -------------------------------------------------------------------
+make_h_calc_variables
+if test @"$(basename "$0")" = @"make-h";then
+    case "${1}" in
+        ''|-h|--help) sed -n 's/^ *#h: \{0,1\}//p' "$0" ;;
+        *)            make_h "$@"; exit 0;;
+    esac
+fi
